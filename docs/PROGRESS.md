@@ -20,3 +20,10 @@
 - Implemented pure CrdtMerger.merge() function that evaluates only the provided CellValues.
 - Documented decision: merge() explicitly omits incoming physical time validation against server time. Time validation is a separate concern (Phase 4 WebSocket boundary) that will REJECT ops with excessive future skew, rather than silently clamping/rewriting timestamps, to prevent local client state from diverging from server state.
 
+
+## Phase 2: Fractional Indexing (2026-08-14)
+- Implemented PositionKey as a base-62 fractional-indexing generator.
+- Added exact string midpoint logic (midpoint(left, right)) to keep keys optimally short.
+- Implemented generate(left, right) which calculates the midpoint and appends a single random base-62 character to function as a collision tiebreaker for concurrent inserts, eliminating the need for central coordination.
+- Wrote pathological tests (1,000 sequential inserts at start, end, and middle) to assert that key length grows reasonably (under 300 chars) and never triggers exhaustion/crashes, preventing slow-render bugs in production.
+
