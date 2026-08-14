@@ -13,3 +13,10 @@
   - Added `.env.example` for environment configurations (API and WebSocket URLs).
   - Configured Vitest for unit testing.
 - **CI/CD**: Added a GitHub Actions workflow `.github/workflows/ci.yml` that runs `./gradlew test` and `npm test` on every push.
+
+## Phase 1: Core CRDT (2026-08-13)
+- Implemented HybridLogicalClock, CellValue, and CrdtMerger.
+- HybridLogicalClock.now() handles system clock jumping backward (NTP correction) by preserving the last known physical time and incrementing the logical counter to guarantee monotonicity.
+- Implemented pure CrdtMerger.merge() function that evaluates only the provided CellValues.
+- Documented decision: merge() explicitly omits incoming physical time validation against server time. Time validation is a separate concern (Phase 4 WebSocket boundary) that will REJECT ops with excessive future skew, rather than silently clamping/rewriting timestamps, to prevent local client state from diverging from server state.
+
