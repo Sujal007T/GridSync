@@ -27,3 +27,31 @@
 - Implemented generate(left, right) which calculates the midpoint and appends a single random base-62 character to function as a collision tiebreaker for concurrent inserts, eliminating the need for central coordination.
 - Wrote pathological tests (1,000 sequential inserts at start, end, and middle) to assert that key length grows reasonably (under 300 chars) and never triggers exhaustion/crashes, preventing slow-render bugs in production.
 
+
+## Phase 3: Persistence and Idempotency (2026-08-15)
+- Added Flyway migration \V2__persistence.sql\ for \op_log\, \grid_state\, and \snapshots\ schemas.
+- Added a \UNIQUE\ constraint on \(sheet_id, op_id)\ to \op_log\ strictly scoped to the sheet.
+- Added a \CREATE INDEX\ on \op_log(sheet_id, seq)\ to optimize subsequent reconnect-catch-up queries.
+- Created JPA entities and repositories: \OpLogRepository\ and \GridStateRepository\.
+- Implemented \SheetService.applyOpTransactional(...)\ marked with \@Transactional\ to atomically insert into \op_log\ and upsert into \grid_state\ via \CrdtMerger.merge()\ in one transaction.
+- Verified via a Testcontainers integration test that inserting the same \Op\ twice with the same \op_id\ is intercepted by an idempotency check as a clean no-op, preventing double-merges or duplicate row bugs.
+
+
+## Spring Boot Version Note
+- The project is currently pinned to Spring Boot 4.1.0 in \uild.gradle\. Although Phase 0 originally scoped Spring Boot 3.x, the Initializr zip pulled down 4.1.0. This has been confirmed and explicitly kept as the deliberate working version moving forward unless instructed otherwise.
+
+
+## Concurrency Bug Fixes (Pre-Phase 4)
+- **Bug 1 (Lost Update on \grid_state\)**: Two concurrent transactions updating the same cell could both read the same base state, resulting in a silent overwrite of the merged result. Fixed by switching the \indById\ lookup in \pplyOpTransactional\ to a pessimistic lock (\@Lock(LockModeType.PESSIMISTIC_WRITE)\) via \GridStateRepository.findWithLockBySheetIdAndRowIdAndColId\. A concurrent threaded test confirms that both ops are properly sequenced and merged into the final state.
+- **Bug 2 (Idempotency Race)**: Two concurrent identical ops could both pass the initial \existsBySheetIdAndOpId\ check before either committed, leading to an uncaught \DataIntegrityViolationException\ breaking the second application instead of gracefully resolving as a no-op. Fixed by wrapping the \opLogRepository.saveAndFlush\ in a specific try/catch block and annotating the method with \@Transactional(noRollbackFor = DataIntegrityViolationException.class)\ to prevent Spring from throwing an \UnexpectedRollbackException\ to the caller. A concurrent test validates that submitting the same \op_id\ exactly simultaneously resolves cleanly.
+
+
+## Phase 3: Idempotency Fix (2026-08-15)
+- **Why the try/catch approach failed**: Catching \DataIntegrityViolationException\ in Java successfully hid the exception from the caller, but failed to address the fact that PostgreSQL immediately aborts the current transaction when the unique constraint is violated. Even with Spring's \
+oRollbackFor\, any subsequent commands sent to Postgres on that connection (including the final \COMMIT\) would fail with 'current transaction is aborted'.
+- **The Native Query Fix**: Replaced the entire exists-check + insert + try/catch with a single atomic native SQL query using \INSERT ... ON CONFLICT DO NOTHING\. This correctly handles concurrency inside the database engine without poisoning the active connection/transaction.
+- **First-Insert Races**: Documented that the pessimistic write lock on \grid_state\ currently does not handle the edge case of two concurrent transactions attempting the *first-ever* insert for a specific cell, because \indWithLock\ returns empty for both and neither can lock a non-existent row, leading to a primary key collision on insert. Handling this generically within JPA is tricky, so it is left explicitly unhandled for now until row/col creation is serialized or a secondary fallback strategy is needed.
+
+
+- **GridState First-Insert Race Resolved**: Handled the edge case where two concurrent transactions attempt to insert the first-ever edit for a new cell. Instead of attempting a pessimistic lock (which fails because the row doesn't exist) and racing on the insert, we now execute a blind \INSERT INTO grid_state ... ON CONFLICT DO NOTHING\ with the raw incoming \CellValue\. If it returns 1, we won the race and we're done. If it returns 0, the row already exists (either from a prior op or a concurrent thread that just won the race), so we fall through to the pessimistic lock + \CrdtMerger.merge()\ path. This brilliantly ensures \CrdtMerger\ logic remains entirely in Java and is never duplicated into complex SQL.
+
