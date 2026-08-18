@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { useSheetStore } from '../useSheetStore';
 import { HybridLogicalClock } from '../../crdt/HybridLogicalClock';
 import { v4 as uuidv4 } from 'uuid';
-import { stompClient, Op } from '../../api/stompClient';
+import { stompClient, type Op } from '../../api/stompClient';
 
 // Mock stompClient
 vi.mock('../../api/stompClient', () => ({
@@ -114,5 +114,21 @@ describe('useSheetStore', () => {
     useSheetStore.getState().handleOpError('missing-opId', "Unknown error");
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('missing-opId'));
     consoleSpy.mockRestore();
+  });
+
+  it('seedGrid generates monotonically increasing PositionKeys', () => {
+    useSheetStore.getState().seedGrid(10, 5);
+    const { rows, cols } = useSheetStore.getState();
+    
+    expect(rows.length).toBe(10);
+    expect(cols.length).toBe(5);
+
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i - 1].key < rows[i].key).toBe(true);
+    }
+    
+    for (let i = 1; i < cols.length; i++) {
+      expect(cols[i - 1].key < cols[i].key).toBe(true);
+    }
   });
 });

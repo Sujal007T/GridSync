@@ -15,7 +15,6 @@ export type ErrorCallback = (opId: string, errorMsg: string) => void;
 
 class StompClientService {
   private client: Client | null = null;
-  private currentSheetId: string | null = null;
 
   connect(
     sheetId: string,
@@ -24,8 +23,6 @@ class StompClientService {
     onError: ErrorCallback,
     onConnected?: () => void
   ) {
-    this.currentSheetId = sheetId;
-
     this.client = new Client({
       // We must use webSocketFactory because the server is configured with SockJS
       webSocketFactory: () => new SockJS('http://localhost:8080/ws'),

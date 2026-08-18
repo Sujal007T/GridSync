@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { merge } from '../CrdtMerger';
-import { CellValue } from '../CellValue';
+import type { CellValue } from '../CellValue';
 import { HybridLogicalClock } from '../HybridLogicalClock';
 import { v4 as uuidv4 } from 'uuid';
 
