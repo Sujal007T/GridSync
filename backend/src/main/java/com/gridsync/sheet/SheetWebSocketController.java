@@ -31,15 +31,19 @@ public class SheetWebSocketController {
         // Manual validation to bypass STOMP @Valid gotchas
         Set<ConstraintViolation<Op>> violations = validator.validate(op);
         if (!violations.isEmpty()) {
-            throw new IllegalArgumentException(violations.iterator().next().getMessage());
+            throw new OpRejectedException(violations.iterator().next().getMessage(), op.opId());
         }
 
         if (!sheetId.equals(op.sheetId())) {
-            throw new IllegalArgumentException("Sheet ID mismatch in payload");
+            throw new OpRejectedException("Sheet ID mismatch in payload", op.opId());
         }
 
         // Validate physical time future skew
-        hlcValidator.validateIncoming(op.hlc());
+        try {
+            hlcValidator.validateIncoming(op.hlc());
+        } catch (IllegalArgumentException e) {
+            throw new OpRejectedException(e.getMessage(), op.opId());
+        }
 
         // Apply op atomically
         sheetService.applyOpTransactional(op);
@@ -48,9 +52,9 @@ public class SheetWebSocketController {
         messagingTemplate.convertAndSend("/topic/sheet/" + sheetId, op);
     }
 
-    @org.springframework.messaging.handler.annotation.MessageExceptionHandler
+    @org.springframework.messaging.handler.annotation.MessageExceptionHandler(OpRejectedException.class)
     @org.springframework.messaging.simp.annotation.SendToUser("/queue/errors")
-    public java.util.Map<String, String> handleException(IllegalArgumentException exception) {
-        return java.util.Map.of("error", exception.getMessage());
+    public java.util.Map<String, String> handleException(OpRejectedException exception) {
+        return java.util.Map.of("error", exception.getMessage(), "opId", exception.getOpId().toString());
     }
 }

@@ -99,7 +99,7 @@ public class WebSocketIntegrationTest {
         HybridLogicalClock hlc = HybridLogicalClock.now(UUID.randomUUID(), Clock.systemUTC());
         Op op = new Op(sheetId, UUID.randomUUID(), "CELL_SET", payload, hlc);
 
-        BlockingQueue<String> errorQueue = new LinkedBlockingQueue<>();
+        BlockingQueue<java.util.Map<String, String>> errorQueue = new LinkedBlockingQueue<>();
         session.subscribe("/user/queue/errors", new org.springframework.messaging.simp.stomp.StompFrameHandler() {
             @Override
             public Type getPayloadType(StompHeaders headers) {
@@ -109,7 +109,7 @@ public class WebSocketIntegrationTest {
             @Override
             public void handleFrame(StompHeaders headers, Object payload) {
                 java.util.Map<String, String> map = (java.util.Map<String, String>) payload;
-                errorQueue.offer(map.get("error"));
+                errorQueue.offer(map);
             }
         });
 
@@ -118,9 +118,10 @@ public class WebSocketIntegrationTest {
 
         session.send("/app/sheet/" + sheetId + "/op", op);
         
-        String errorMsg = errorQueue.poll(5, TimeUnit.SECONDS);
+        java.util.Map<String, String> errorMsg = errorQueue.poll(5, TimeUnit.SECONDS);
         assertNotNull(errorMsg, "Should receive an error frame");
-        assertTrue(errorMsg.contains("Payload exceeds maximum allowed size"), "Error should mention payload size");
+        assertTrue(errorMsg.get("error").contains("Payload exceeds maximum allowed size"), "Error should mention payload size");
+        assertEquals(op.opId().toString(), errorMsg.get("opId"), "Error should include correct opId");
     }
 
     @Test
@@ -129,7 +130,7 @@ public class WebSocketIntegrationTest {
         String token = jwtService.generateDevToken(userId);
         
         StompSession session = connect(token);
-        BlockingQueue<String> errorQueue = new LinkedBlockingQueue<>();
+        BlockingQueue<java.util.Map<String, String>> errorQueue = new LinkedBlockingQueue<>();
         session.subscribe("/user/queue/errors", new org.springframework.messaging.simp.stomp.StompFrameHandler() {
             @Override
             public Type getPayloadType(StompHeaders headers) {
@@ -139,7 +140,7 @@ public class WebSocketIntegrationTest {
             @Override
             public void handleFrame(StompHeaders headers, Object payload) {
                 java.util.Map<String, String> map = (java.util.Map<String, String>) payload;
-                errorQueue.offer(map.get("error"));
+                errorQueue.offer(map);
             }
         });
 
@@ -156,9 +157,10 @@ public class WebSocketIntegrationTest {
 
         session.send("/app/sheet/" + sheetId + "/op", op);
         
-        String errorMsg = errorQueue.poll(5, TimeUnit.SECONDS);
+        java.util.Map<String, String> errorMsg = errorQueue.poll(5, TimeUnit.SECONDS);
         assertNotNull(errorMsg, "Should receive an error frame");
-        assertTrue(errorMsg.contains("HLC physical time exceeds maximum allowed future skew"), "Error should mention HLC skew");
+        assertTrue(errorMsg.get("error").contains("HLC physical time exceeds maximum allowed future skew"), "Error should mention HLC skew");
+        assertEquals(op.opId().toString(), errorMsg.get("opId"), "Error should include correct opId");
     }
 
     @Test
@@ -167,7 +169,7 @@ public class WebSocketIntegrationTest {
         String token = jwtService.generateDevToken(userId);
         
         StompSession session = connect(token);
-        BlockingQueue<String> errorQueue = new LinkedBlockingQueue<>();
+        BlockingQueue<java.util.Map<String, String>> errorQueue = new LinkedBlockingQueue<>();
         session.subscribe("/user/queue/errors", new org.springframework.messaging.simp.stomp.StompFrameHandler() {
             @Override
             public Type getPayloadType(StompHeaders headers) {
@@ -177,7 +179,7 @@ public class WebSocketIntegrationTest {
             @Override
             public void handleFrame(StompHeaders headers, Object payload) {
                 java.util.Map<String, String> map = (java.util.Map<String, String>) payload;
-                errorQueue.offer(map.get("error"));
+                errorQueue.offer(map);
             }
         });
 
@@ -204,9 +206,10 @@ public class WebSocketIntegrationTest {
         
         session.send("/app/sheet/" + sheetId + "/op", op2);
 
-        String errorMsg = errorQueue.poll(5, TimeUnit.SECONDS);
+        java.util.Map<String, String> errorMsg = errorQueue.poll(5, TimeUnit.SECONDS);
         assertNotNull(errorMsg, "Should receive an error frame after revocation");
-        assertTrue(errorMsg.contains("User does not have access to this sheet"), "Error should mention access");
+        assertTrue(errorMsg.get("error").contains("User does not have access to this sheet"), "Error should mention access");
+        assertEquals(op2.opId().toString(), errorMsg.get("opId"), "Error should include correct opId");
     }
 
     @Test

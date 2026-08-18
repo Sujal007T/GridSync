@@ -43,7 +43,16 @@ public class SheetAccessInterceptor implements ChannelInterceptor {
                         throw new IllegalArgumentException("User not authenticated");
                     }
                     if (!sheetMemberRepository.existsBySheetIdAndUserId(sheetId, principal.getUserId())) {
-                        messagingTemplate.convertAndSendToUser(principal.getName(), "/queue/errors", java.util.Map.of("error", "User does not have access to this sheet"));
+                        String opIdStr = "unknown";
+                        if (StompCommand.SEND.equals(cmd) && message.getPayload() instanceof byte[] bytes) {
+                            try {
+                                com.fasterxml.jackson.databind.JsonNode root = new com.fasterxml.jackson.databind.ObjectMapper().readTree(bytes);
+                                if (root.has("opId")) {
+                                    opIdStr = root.get("opId").asText();
+                                }
+                            } catch (Exception e) {}
+                        }
+                        messagingTemplate.convertAndSendToUser(principal.getName(), "/queue/errors", java.util.Map.of("error", "User does not have access to this sheet", "opId", opIdStr));
                         throw new IllegalArgumentException("User does not have access to this sheet");
                     }
                 }
