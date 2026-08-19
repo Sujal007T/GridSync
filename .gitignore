@@ -1,0 +1,21 @@
+# Root-level gitignore for GridSync monorepo
+# --- OS / Editor ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.iml
+
+# --- Secrets / Local config overrides ------------------------------------------
+# application.properties is committed with safe local-dev defaults.
+# Override with application-local.properties (never commit that file):
+backend/src/main/resources/application-local.properties
+*.env
+!.env.example
+
+# --- Docker volumes / local data -----------------------------------------------
+docker-data/
+
+# --- Misc build artefacts not covered by sub-gitignores -----------------------
+*.class
+*.jar

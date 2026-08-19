@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@stomp/stompjs": "^7.3.0",
+    "fake-indexeddb": "^6.2.5",
+    "idb": "^8.0.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-window": "^1.8.10",

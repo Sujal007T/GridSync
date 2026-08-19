@@ -4,6 +4,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.List;
 import java.util.UUID;
 
 public interface OpLogRepository extends JpaRepository<OpLogEntity, Long> {
@@ -24,4 +25,10 @@ public interface OpLogRepository extends JpaRepository<OpLogEntity, Long> {
         @Param("hlcLogical") int hlcLogical,
         @Param("replicaId") UUID replicaId
     );
+
+    /**
+     * Catch-up query: returns all ops for a sheet with seq > sinceSeq, ordered ascending.
+     * Uses the (sheet_id, seq) index created in Phase 3's V2 migration.
+     */
+    List<OpLogEntity> findBySheetIdAndSeqGreaterThanOrderBySeqAsc(UUID sheetId, Long sinceSeq);
 }

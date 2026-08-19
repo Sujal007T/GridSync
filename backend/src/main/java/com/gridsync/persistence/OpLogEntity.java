@@ -50,4 +50,19 @@ public class OpLogEntity {
         this.hlcLogical = hlcLogical;
         this.replicaId = replicaId;
     }
+
+    // Public getters — used by SheetRestController (different package) for DTO projection.
+    // Fields themselves remain private; only the DTO record is exposed publicly.
+    public Long getSeq() { return seq; }
+    public UUID getOpId() { return opId; }
+    public String getOpType() { return opType; }
+    public String getPayload() { return payload; }
+    public long getHlcPhysical() { return hlcPhysical; }
+    public int getHlcLogical() { return hlcLogical; }
+    public UUID getReplicaId() { return replicaId; }
+
+    /** Converts to the public DTO used by REST responses. Public so cross-package callers can use it. */
+    public OpLogDto toDto() {
+        return new OpLogDto(seq, opId, opType, payload, hlcPhysical, hlcLogical, replicaId);
+    }
 }
