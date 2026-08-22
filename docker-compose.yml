@@ -9,6 +9,7 @@ services:
       POSTGRES_USER: gridsync
       POSTGRES_PASSWORD: password
       POSTGRES_DB: gridsync
+      TZ: UTC
     volumes:
       - postgres_data:/var/lib/postgresql/data
 

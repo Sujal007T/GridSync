@@ -31,4 +31,17 @@ public interface OpLogRepository extends JpaRepository<OpLogEntity, Long> {
      * Uses the (sheet_id, seq) index created in Phase 3's V2 migration.
      */
     List<OpLogEntity> findBySheetIdAndSeqGreaterThanOrderBySeqAsc(UUID sheetId, Long sinceSeq);
+
+    void deleteAllBySheetIdAndSeqLessThan(UUID sheetId, long seq);
+
+    @Query("SELECT COALESCE(MAX(o.seq), 0) FROM OpLogEntity o WHERE o.sheetId = :sheetId")
+    long findMaxSeqBySheetId(@Param("sheetId") UUID sheetId);
+
+    @Query("SELECT COALESCE(MAX(o.seq), 0) FROM OpLogEntity o WHERE o.sheetId = :sheetId AND o.hlcPhysical <= :maxHlcPhysical")
+    long findMaxSeqBySheetIdAndHlcPhysicalLessThanEqual(@Param("sheetId") UUID sheetId, @Param("maxHlcPhysical") long maxHlcPhysical);
+
+    org.springframework.data.domain.Slice<OpLogEntity> findBySheetIdAndSeqBetweenOrderBySeqAsc(UUID sheetId, Long minSeq, Long maxSeq, org.springframework.data.domain.Pageable pageable);
+
+    @Query("SELECT DISTINCT o.hlcPhysical FROM OpLogEntity o WHERE o.sheetId = :sheetId ORDER BY o.hlcPhysical DESC")
+    org.springframework.data.domain.Slice<Long> findDistinctHlcPhysicalBySheetIdOrderByHlcPhysicalDesc(@Param("sheetId") UUID sheetId, org.springframework.data.domain.Pageable pageable);
 }

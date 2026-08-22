@@ -1,21 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSheetStore } from './store/useSheetStore';
 import { HandRolledGrid } from './components/HandRolledGrid';
 import { ReactWindowGrid } from './components/ReactWindowGrid';
+import { HistoryPanel } from './components/HistoryPanel';
+import { stompClient } from './api/stompClient';
 import './App.css';
 
 function App() {
   const seedGrid = useSheetStore(state => state.seedGrid);
+  const setSheetContext = useSheetStore(state => state.setSheetContext);
+  const applyRemoteOp = useSheetStore(state => state.applyRemoteOp);
+  const handleOpError = useSheetStore(state => state.handleOpError);
+  const applyCatchUpOps = useSheetStore(state => state.applyCatchUpOps);
   const rows = useSheetStore(state => state.rows);
   const error = useSheetStore(state => state.error);
   const [useReactWindow, setUseReactWindow] = useState(false);
+
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      // Auto-connect STOMP for development
+      fetch('/api/auth/dev-token', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+          const { token, sheetId, userId } = data;
+          setSheetContext(sheetId, userId);
+          stompClient.connect(sheetId, token, applyRemoteOp, handleOpError, applyCatchUpOps);
+        })
+        .catch(err => console.error('Failed to init dev session', err));
+      
+      return () => {
+        stompClient.disconnect();
+      };
+    }
+  }, []);
 
   const handleSeed = () => {
     seedGrid(10000, 26); // 10k rows, 26 cols
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', boxSizing: 'border-box' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', boxSizing: 'border-box', position: 'relative' }}>
       <header style={{ padding: '10px', background: '#f5f5f5', borderBottom: '1px solid #ddd', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '15px' }}>
         <h1 style={{ margin: 0, fontSize: '1.2rem' }}>GridSync</h1>
         
@@ -42,7 +66,8 @@ function App() {
       </header>
       
       <main style={{ flexGrow: 1, overflow: 'hidden', position: 'relative' }}>
-        <React.Profiler id="GridProfiler" onRender={(id, phase, actualDuration) => {
+        <HistoryPanel />
+        <React.Profiler id="GridProfiler" onRender={(_id, phase, actualDuration) => {
           console.log(`[PROFILER] ${useReactWindow ? 'ReactWindow' : 'HandRolled'} ${phase} duration: ${actualDuration.toFixed(2)}ms`);
         }}>
           {rows.length === 0 ? (

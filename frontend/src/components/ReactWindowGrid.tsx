@@ -41,7 +41,10 @@ export const ReactWindowGrid: React.FC = () => {
 
   // Memoize itemData so CellRenderer's data prop has a stable reference and doesn't
   // cause a re-render of every visible cell when an unrelated state change triggers a parent re-render.
-  const itemData = useMemo<ItemData>(() => ({ rows, cols }), [rows, cols]);
+  const itemData = useMemo<ItemData>(() => ({ 
+    rows: rows.map(r => ({ id: r.id, positionKey: r.key })), 
+    cols: cols.map(c => ({ id: c.id, positionKey: c.key })) 
+  }), [rows, cols]);
 
   // Scroll to follow focus mechanism
   useEffect(() => {

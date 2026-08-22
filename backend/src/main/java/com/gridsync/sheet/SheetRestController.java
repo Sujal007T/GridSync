@@ -25,13 +25,16 @@ public class SheetRestController {
     private final OpLogRepository opLogRepository;
     private final JwtService jwtService;
     private final SheetMemberRepository sheetMemberRepository;
+    private final com.gridsync.history.ReplayService replayService;
 
     public SheetRestController(OpLogRepository opLogRepository,
                                 JwtService jwtService,
-                                SheetMemberRepository sheetMemberRepository) {
+                                SheetMemberRepository sheetMemberRepository,
+                                com.gridsync.history.ReplayService replayService) {
         this.opLogRepository = opLogRepository;
         this.jwtService = jwtService;
         this.sheetMemberRepository = sheetMemberRepository;
+        this.replayService = replayService;
     }
 
     /**
@@ -72,5 +75,42 @@ public class SheetRestController {
                 .toList();
 
         return ResponseEntity.ok(ops);
+    }
+    @GetMapping("/{sheetId}/history/timeline")
+    public ResponseEntity<List<Long>> getHistoryTimeline(
+            @PathVariable UUID sheetId,
+            @RequestHeader(name = "Authorization", required = false) String authHeader) {
+        
+        if (!isAuthorized(sheetId, authHeader)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build(); // Generic forbidden for simplicity
+        }
+
+        List<Long> timestamps = opLogRepository
+                .findDistinctHlcPhysicalBySheetIdOrderByHlcPhysicalDesc(sheetId, org.springframework.data.domain.PageRequest.of(0, 50))
+                .getContent();
+
+        return ResponseEntity.ok(timestamps);
+    }
+
+    @GetMapping("/{sheetId}/history")
+    public ResponseEntity<List<com.gridsync.persistence.GridStateEntity>> getHistoryAt(
+            @PathVariable UUID sheetId,
+            @RequestParam(name = "at") long targetTimestamp,
+            @RequestHeader(name = "Authorization", required = false) String authHeader) {
+        
+        if (!isAuthorized(sheetId, authHeader)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        List<com.gridsync.persistence.GridStateEntity> rebuiltState = replayService.rebuildState(sheetId, targetTimestamp);
+        return ResponseEntity.ok(rebuiltState);
+    }
+
+    private boolean isAuthorized(UUID sheetId, String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) return false;
+        String token = authHeader.substring(7);
+        UUID userId = jwtService.validateTokenAndGetUserId(token);
+        if (userId == null) return false;
+        return sheetMemberRepository.existsBySheetIdAndUserId(sheetId, userId);
     }
 }

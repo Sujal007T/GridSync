@@ -13,7 +13,8 @@ interface CellProps {
 export const Cell: React.FC<CellProps> = ({ rowId, colId, style }) => {
   const cellId = `${rowId}:${colId}`;
   
-  const cellValue = useSheetStore(state => state.cells[cellId]);
+  const historyMode = useSheetStore(state => state.historyMode);
+  const cellValue = useSheetStore(state => historyMode ? state.historyCells[cellId] : state.cells[cellId]);
   const draftEdit = useSheetStore(state => state.draftEdits[cellId]);
   const focusedCellId = useSheetStore(state => state.focusedCellId);
   const isFocused = focusedCellId === cellId;
@@ -24,7 +25,7 @@ export const Cell: React.FC<CellProps> = ({ rowId, colId, style }) => {
 
   const { setFocusedCell, setDraftEdit, cancelEdit, commitEdit } = useSheetStore.getState();
   
-  const isEditing = draftEdit !== undefined;
+  const isEditing = draftEdit !== undefined && !historyMode;
   
   const cellRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -41,6 +42,7 @@ export const Cell: React.FC<CellProps> = ({ rowId, colId, style }) => {
   }, [isFocused, isEditing]);
 
   const handleDoubleClick = () => {
+    if (historyMode) return;
     if (!isEditing) {
       setDraftEdit(cellId, cellValue?.value || "");
       setFocusedCell(cellId);
@@ -69,6 +71,7 @@ export const Cell: React.FC<CellProps> = ({ rowId, colId, style }) => {
     }
 
     if (e.key === 'Enter') {
+      if (historyMode) return;
       setDraftEdit(cellId, cellValue?.value || "");
       e.preventDefault();
     } else if (e.key === 'ArrowUp') {

@@ -57,6 +57,9 @@ class StompClientService {
   private client: Client | null = null;
   private token: string | null = null;
   private sheetId: string | null = null;
+
+  /** Exposes the current JWT token for REST calls that need Authorization. */
+  getToken(): string | null { return this.token; }
   private onMessageCb: MessageCallback | null = null;
   private onErrorCb: ErrorCallback | null = null;
   private onCatchUpCb: CatchUpCallback | null = null;
@@ -91,7 +94,7 @@ class StompClientService {
     // Disable the library's built-in reconnect entirely — we manage it ourselves
     // with custom exponential backoff so we can integrate the catch-up flow.
     this.client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+      webSocketFactory: () => new SockJS('http://localhost:8080/ws-grid'),
       connectHeaders: {
         Authorization: `Bearer ${this.token}`
       },
@@ -103,7 +106,7 @@ class StompClientService {
       heartbeatOutgoing: 4000,
     });
 
-    this.client.onConnect = async (frame) => {
+    this.client.onConnect = async (_frame) => {
       console.log('[STOMP] Connected, attempt was:', this.reconnectAttempt);
       this.reconnectAttempt = 0; // reset backoff on successful connect
 

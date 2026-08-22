@@ -12,9 +12,11 @@ import java.util.UUID;
 public class AuthController {
 
     private final JwtService jwtService;
+    private final SheetMemberRepository sheetMemberRepository;
 
-    public AuthController(JwtService jwtService) {
+    public AuthController(JwtService jwtService, SheetMemberRepository sheetMemberRepository) {
         this.jwtService = jwtService;
+        this.sheetMemberRepository = sheetMemberRepository;
     }
 
     @PostMapping("/dev-token")
@@ -22,6 +24,16 @@ public class AuthController {
         // Issue a token for a new mock user UUID for development
         UUID newUserId = UUID.randomUUID();
         String token = jwtService.generateDevToken(newUserId);
-        return Map.of("token", token, "userId", newUserId.toString());
+        
+        UUID sheetId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        if (!sheetMemberRepository.existsBySheetIdAndUserId(sheetId, newUserId)) {
+            sheetMemberRepository.save(new SheetMemberEntity(sheetId, newUserId));
+        }
+
+        return Map.of(
+            "token", token, 
+            "userId", newUserId.toString(),
+            "sheetId", sheetId.toString()
+        );
     }
 }

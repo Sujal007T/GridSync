@@ -30,6 +30,12 @@ export interface SheetState {
   /** The highest op_log seq the client has successfully processed. Sent to catch-up endpoint on reconnect. */
   lastSeenSeq: number;
 
+  historyMode: boolean;
+  historyTimestamp: number | null;
+  historyCells: Record<string, CellValue>;
+  setHistoryMode: (enabled: boolean) => void;
+  setHistoryState: (timestamp: number, cells: Record<string, CellValue>) => void;
+
   setSheetContext: (sheetId: string, replicaId: string) => void;
   seedGrid: (numRows: number, numCols: number) => void;
 
@@ -58,6 +64,13 @@ export const useSheetStore = create<SheetState>((set, get) => ({
   focusedCellId: null,
   draftEdits: {},
   lastSeenSeq: 0,
+
+  historyMode: false,
+  historyTimestamp: null,
+  historyCells: {},
+
+  setHistoryMode: (enabled) => set({ historyMode: enabled, historyTimestamp: enabled ? get().historyTimestamp : null }),
+  setHistoryState: (timestamp, cells) => set({ historyTimestamp: timestamp, historyCells: cells }),
 
   setSheetContext: (sheetId, replicaId) => set({ sheetId, replicaId }),
 

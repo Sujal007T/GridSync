@@ -49,4 +49,10 @@ public class GridStateEntity {
     public CellValue toCellValue() {
         return new CellValue(value, new HybridLogicalClock(hlcPhysical, hlcLogical, replicaId), replicaId);
     }
+
+    public UUID getSheetId() { return sheetId; }
+    public UUID getRowId() { return rowId; }
+    public UUID getColId() { return colId; }
+    public String getValue() { return value; }
+    public long getHlcPhysical() { return hlcPhysical; }
 }

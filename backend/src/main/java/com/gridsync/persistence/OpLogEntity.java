@@ -54,6 +54,7 @@ public class OpLogEntity {
     // Public getters — used by SheetRestController (different package) for DTO projection.
     // Fields themselves remain private; only the DTO record is exposed publicly.
     public Long getSeq() { return seq; }
+    public UUID getSheetId() { return sheetId; }
     public UUID getOpId() { return opId; }
     public String getOpType() { return opType; }
     public String getPayload() { return payload; }

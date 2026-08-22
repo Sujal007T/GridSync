@@ -18,14 +18,17 @@ public class SheetService {
 
     private final OpLogRepository opLogRepository;
     private final GridStateRepository gridStateRepository;
+    private final com.gridsync.history.SnapshotService snapshotService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public SheetService(OpLogRepository opLogRepository, GridStateRepository gridStateRepository) {
+    public SheetService(OpLogRepository opLogRepository, GridStateRepository gridStateRepository, com.gridsync.history.SnapshotService snapshotService) {
         this.opLogRepository = opLogRepository;
         this.gridStateRepository = gridStateRepository;
+        this.snapshotService = snapshotService;
     }
 
     @Transactional
+
     public void applyOpTransactional(Op op) {
         int inserted = opLogRepository.insertOpLogIfNotExists(
             op.sheetId(), op.opId(), op.opType(), op.payload(),
@@ -63,6 +66,14 @@ public class SheetService {
             } catch (Exception e) {
                 throw new RuntimeException("Failed to process CELL_SET payload", e);
             }
+        }
+
+        try {
+            if (java.util.concurrent.ThreadLocalRandom.current().nextInt(20) == 0) {
+                snapshotService.createSnapshotIfNeeded(op.sheetId());
+            }
+        } catch (org.springframework.core.task.TaskRejectedException ignored) {
+            // Queue is full, that's fine, we'll try again on a subsequent op
         }
     }
 }

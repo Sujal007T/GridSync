@@ -50,3 +50,7 @@ tasks.named('test') {
 		events "passed", "skipped", "failed"
 	}
 }
+
+tasks.named('bootRun') {
+	systemProperty 'user.timezone', 'UTC'
+}

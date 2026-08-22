@@ -104,3 +104,24 @@
 - **Convergence Guarantees & Testing**:
   - **Scrambled-order convergence**: Tested the scenario where local pending ops and remote catch-up ops arrive concurrently. Due to CRDT commutative/associative properties, applying them out of temporal order converged to the exact same cell state as sequential application.
   - **Lost-ack idempotency test**: Proved that if the backend commits an op but the broadcast ack is lost, the client's reconnect resend (via IndexedDB replay) is safely ignored by Postgres `ON CONFLICT DO NOTHING`, and the double-apply to `useSheetStore`'s local state is resolved idempotently without diverging.
+
+## Phase 8: History Scrubber (2026-08-19)
+- **Structural Persistence Scope**: As in Phase 6, structural changes (`ROW_INSERT`/`COL_INSERT`) are not persisted in `grid_state` or `op_log`. Therefore, history playback in this phase is strictly scoped to **cell-value history only**. Structural changes are not represented in history yet, and this known limitation is disclaimed in the frontend UI (`HistoryPanel`).
+- **Backend Retention Policy**: Implemented periodic snapshotting in `SnapshotService` (using `REPEATABLE_READ` to guarantee `max(seq)` matches the read cell values). Retention policy: retain 10 most recent snapshots; prune `snapshots` table rows older than the 10th (op_log pruning deferred — pruning op_log would break Phase 7's offline-resend idempotency uniqueness constraint).
+- **Backend History Endpoints**: Added `/api/sheets/{sheetId}/history/timeline` (50 most recent edit timestamps) and `/api/sheets/{sheetId}/history?at={timestamp}` (full state reconstruction at any past point via `ReplayService`).
+- **Op-Log Pruning Decision**: Unconditional op_log pruning was removed. The uniqueness constraint `(sheet_id, op_id)` in op_log is required for Phase 7's offline resend idempotency. If pruned, a reconnected client whose original op row is gone would experience a "new" insert that could cause duplicate state divergence.
+- **Bugs Found and Fixed During Phase 8 Verification**:
+  1. **Wrong WebSocket endpoint URL**: `stompClient.ts` pointed to `/ws` but backend registers at `/ws-grid`. Fixed URL to `http://localhost:8080/ws-grid`.
+  2. **Missing Authorization header on history REST calls**: `history.ts` called `/history/timeline` and `/history?at=` without the `Authorization: Bearer` header, causing 403. Fixed by exposing `stompClient.getToken()` and using it in `authHeaders()` in `history.ts`.
+  3. **dev-token not returning sheetId**: `AuthController` only returned `{token, userId}`. Fixed to also create a `SheetMemberEntity` for the well-known dev sheetId (`00000000-0000-0000-0000-000000000001`) and return `sheetId` in the response so the frontend can call `setSheetContext` without hardcoding it. Note: `AuthController.getDevToken()` auto-creates `SheetMemberEntity` membership for a hardcoded well-known sheet ID on every request; this is a dev-only convenience with no real authorization check and MUST be removed or gated in Phase 12a before production deployment.
+  4. **STOMP connection never initiated**: `App.tsx` had no `useEffect` to fetch the dev-token and call `stompClient.connect()`. Fixed by adding a `useEffect` that automatically bootstraps the session in DEV mode.
+- **End-to-End Verification Results (2026-08-20)**:
+  - **Method**: Node.js script via STOMP over `ws://localhost:8080/ws-grid/websocket`, then REST calls to `/history/timeline` and `/history?at=`.
+  - **Op 1**: `Cell(ROW_A, COL_1) = "Hello"` sent at `2026-08-20T16:08:02.617Z`.
+  - **Op 2**: `Cell(ROW_A, COL_2) = "World"` sent at `2026-08-20T16:08:05.134Z` (2.5s later).
+  - **Both ops broadcast confirmed**: server returned 2 STOMP broadcasts.
+  - **Timeline**: 2 distinct timestamps returned (`1787242082617`, `1787242085134`).
+  - **History at first timestamp**: 1 cell → `ROW_A:COL_1 = "Hello"` ✓, `COL_2` absent ✓.
+  - **History at last timestamp**: 2 cells → both `"Hello"` and `"World"` present ✓.
+  - **RESULT: PASS** — Snapshot+replay produces correct historical state at any scrubbed timestamp.
+

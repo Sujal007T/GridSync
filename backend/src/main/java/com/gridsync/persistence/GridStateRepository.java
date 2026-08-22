@@ -28,4 +28,6 @@ public interface GridStateRepository extends JpaRepository<GridStateEntity, Grid
         @Param("hlcLogical") int hlcLogical,
         @Param("replicaId") UUID replicaId
     );
+
+    java.util.List<GridStateEntity> findAllBySheetId(UUID sheetId);
 }
