@@ -94,7 +94,7 @@ class StompClientService {
     // Disable the library's built-in reconnect entirely — we manage it ourselves
     // with custom exponential backoff so we can integrate the catch-up flow.
     this.client = new Client({
-      webSocketFactory: () => new SockJS('http://localhost:8080/ws-grid'),
+      webSocketFactory: () => new SockJS('/ws-grid'),
       connectHeaders: {
         Authorization: `Bearer ${this.token}`
       },

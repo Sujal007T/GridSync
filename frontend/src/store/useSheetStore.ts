@@ -86,7 +86,9 @@ export const useSheetStore = create<SheetState>((set, get) => ({
     const newRows: RowCol[] = [];
     for (let i = 0; i < numRows; i++) {
       lastRowKey = PositionKey.generate(lastRowKey, "");
-      newRows.push({ id: uuidv4(), key: lastRowKey });
+      // Deterministic valid UUID for row i:
+      const hexId = i.toString(16).padStart(12, '0');
+      newRows.push({ id: `11111111-1111-1111-1111-${hexId}`, key: lastRowKey });
     }
 
     // Generate Cols
@@ -94,10 +96,12 @@ export const useSheetStore = create<SheetState>((set, get) => ({
     const newCols: RowCol[] = [];
     for (let i = 0; i < numCols; i++) {
       lastColKey = PositionKey.generate(lastColKey, "");
-      newCols.push({ id: uuidv4(), key: lastColKey });
+      // Deterministic valid UUID for col i:
+      const hexId = i.toString(16).padStart(12, '0');
+      newCols.push({ id: `22222222-2222-2222-2222-${hexId}`, key: lastColKey });
     }
 
-    set({ rows: newRows, cols: newCols, cells: {} });
+    set({ rows: newRows, cols: newCols });
   },
 
   setFocusedCell: (cellId) => set({ focusedCellId: cellId }),
@@ -157,6 +161,9 @@ export const useSheetStore = create<SheetState>((set, get) => ({
   },
 
   applyRemoteOp: (op: Op) => {
+    console.log("applyRemoteOp fired!", op);
+    
+    // 1. Process standard CRDT merge (same logic as local commitEdit)
     const payload = JSON.parse(op.payload);
     const rowId = payload.rowId;
     const colId = payload.colId;

@@ -29,11 +29,12 @@ public class ReplayService {
 
     private final OpLogRepository opLogRepository;
     private final SnapshotRepository snapshotRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    public ReplayService(OpLogRepository opLogRepository, SnapshotRepository snapshotRepository) {
+    public ReplayService(OpLogRepository opLogRepository, SnapshotRepository snapshotRepository, ObjectMapper objectMapper) {
         this.opLogRepository = opLogRepository;
         this.snapshotRepository = snapshotRepository;
+        this.objectMapper = objectMapper;
     }
 
     public List<GridStateEntity> rebuildState(UUID sheetId, long targetHlcPhysical) {

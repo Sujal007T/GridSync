@@ -15,13 +15,13 @@ import java.util.UUID;
 public class SheetWebSocketController {
 
     private final SheetService sheetService;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final SheetRedisPublisher redisPublisher;
     private final HlcValidator hlcValidator;
     private final Validator validator;
 
-    public SheetWebSocketController(SheetService sheetService, SimpMessagingTemplate messagingTemplate, HlcValidator hlcValidator, Validator validator) {
+    public SheetWebSocketController(SheetService sheetService, SheetRedisPublisher redisPublisher, HlcValidator hlcValidator, Validator validator) {
         this.sheetService = sheetService;
-        this.messagingTemplate = messagingTemplate;
+        this.redisPublisher = redisPublisher;
         this.hlcValidator = hlcValidator;
         this.validator = validator;
     }
@@ -48,8 +48,8 @@ public class SheetWebSocketController {
         // Apply op atomically
         sheetService.applyOpTransactional(op);
 
-        // Broadcast to all subscribers
-        messagingTemplate.convertAndSend("/topic/sheet/" + sheetId, op);
+        // Publish to Redis (all nodes including this one will receive it and broadcast)
+        redisPublisher.publish(op);
     }
 
     @org.springframework.messaging.handler.annotation.MessageExceptionHandler(OpRejectedException.class)

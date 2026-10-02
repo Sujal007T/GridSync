@@ -4,6 +4,15 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    proxy: {
+      '/api': 'http://localhost',
+      '/ws-grid': {
+        target: 'http://localhost',
+        ws: true
+      }
+    }
+  },
   test: {
     // Use jsdom as the browser-like environment for React component tests
     environment: 'jsdom',

@@ -12,6 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "@stomp/stompjs": "^7.3.0",
+    "puppeteer": "^25.8.0",
     "ws": "^8.21.3"
   }
 }

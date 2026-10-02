@@ -19,3 +19,7 @@ docker-data/
 # --- Misc build artefacts not covered by sub-gitignores -----------------------
 *.class
 *.jar
+
+# --- Node dependencies ---------------------------------------------------------
+node_modules/
+**/node_modules/

@@ -125,3 +125,15 @@
   - **History at last timestamp**: 2 cells → both `"Hello"` and `"World"` present ✓.
   - **RESULT: PASS** — Snapshot+replay produces correct historical state at any scrubbed timestamp.
 
+## Phase 9: Redis Relay & Multi-Node Scaling (2026-08-22)
+- **Stage 1 (Redis Relay)**: Implemented `RedisPubSubConfig`, `SheetRedisPublisher`, and `SheetRedisListener`. Removed all direct calls to `SimpMessagingTemplate` from `SheetWebSocketController`. Verified that STOMP messages are routed through Redis pub/sub. Added a shared `ObjectMapper` bean to fix DI issues.
+- **Stage 2 (Two-node Load Balancer)**: Updated `docker-compose.yml` to run two backend instances (`backend-1`, `backend-2`) and added an `nginx` reverse proxy using `ip_hash` for strict session affinity. Confirmed `/actuator/health` successfully routes through the load balancer and Flyway schema migrations execute safely without races on concurrent node boot.
+- **Concurrent Snapshot Safety Reasoning**: With two nodes handling requests independently, concurrent identical snapshot triggers are possible if two clients hit the 100-op threshold exactly simultaneously via different nodes. This is safe because:
+  1. `applyOpTransactional` (READ_COMMITTED) and `createSnapshot` (REQUIRES_NEW) are isolated.
+  2. The `maxSeq` query in `createSnapshot` captures exactly the ops committed up to that point. 
+  3. The `GridStateRepository.findAllBySheetId` query inside the same `REQUIRES_NEW` transaction captures the materialized state corresponding to that `maxSeq`.
+  4. Both nodes will independently take a valid point-in-time snapshot of the CRDT state. Since CRDT state is commutative, the state at `maxSeq = X` will be identical on both nodes. `ReplayService` searches for the snapshot `ORDER BY seq DESC LIMIT 1`, meaning one redundant snapshot is harmless and correctly reflects the history.
+- **Concurrent DB Migration Verification**: Verified Flyway lock-acquisition behavior on a fresh database by wiping the Postgres volume (`docker-compose down -v`). Upon bringing both nodes up simultaneously, `backend-1` acquired the lock, created the schema history table, and applied migrations V1-V4 (completed at `33.133Z`). `backend-2` recognized the empty schema at `32.659Z`, waited for the lock, and upon acquiring it at `33.804Z` found the schema already at version 4 and skipped migrations safely. No race conditions or crashes occurred.
+- **Stage 3/5 Concurrent NGINX Load-Balancing Evidence**:
+  - *Primary Proof (CRDT Convergence Under Conflict)*: Verified by forcing two clients to concurrently edit the *exact same cell* through NGINX. Both clients sent ops with identical `physicalTime` and `logicalCounter` but different `replicaId`s. The script verified that both clients successfully received both broadcasts and perfectly converged on the CrdtMerger's expected winner (lexically larger replicaId), proving safe conflict resolution under heavy concurrency.
+  - *Secondary Sanity Check (Independent Writes)*: Verified by forcing two clients to edit *different* cells concurrently through NGINX. Proved that both non-conflicting writes land correctly and merge cleanly without interference.

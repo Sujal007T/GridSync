@@ -25,14 +25,16 @@ public class SnapshotService {
     private final GridStateRepository gridStateRepository;
     private final OpLogRepository opLogRepository;
     private final SnapshotRepository snapshotRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public SnapshotService(GridStateRepository gridStateRepository, 
                            OpLogRepository opLogRepository, 
-                           SnapshotRepository snapshotRepository) {
+                           SnapshotRepository snapshotRepository,
+                           ObjectMapper objectMapper) {
         this.gridStateRepository = gridStateRepository;
         this.opLogRepository = opLogRepository;
         this.snapshotRepository = snapshotRepository;
+        this.objectMapper = objectMapper;
     }
 
     /**

@@ -19,12 +19,13 @@ public class SheetService {
     private final OpLogRepository opLogRepository;
     private final GridStateRepository gridStateRepository;
     private final com.gridsync.history.SnapshotService snapshotService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
-    public SheetService(OpLogRepository opLogRepository, GridStateRepository gridStateRepository, com.gridsync.history.SnapshotService snapshotService) {
+    public SheetService(OpLogRepository opLogRepository, GridStateRepository gridStateRepository, com.gridsync.history.SnapshotService snapshotService, ObjectMapper objectMapper) {
         this.opLogRepository = opLogRepository;
         this.gridStateRepository = gridStateRepository;
         this.snapshotService = snapshotService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional
