@@ -161,9 +161,6 @@ export const useSheetStore = create<SheetState>((set, get) => ({
   },
 
   applyRemoteOp: (op: Op) => {
-    console.log("applyRemoteOp fired!", op);
-    
-    // 1. Process standard CRDT merge (same logic as local commitEdit)
     const payload = JSON.parse(op.payload);
     const rowId = payload.rowId;
     const colId = payload.colId;

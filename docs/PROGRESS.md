@@ -137,3 +137,39 @@
 - **Stage 3/5 Concurrent NGINX Load-Balancing Evidence**:
   - *Primary Proof (CRDT Convergence Under Conflict)*: Verified by forcing two clients to concurrently edit the *exact same cell* through NGINX. Both clients sent ops with identical `physicalTime` and `logicalCounter` but different `replicaId`s. The script verified that both clients successfully received both broadcasts and perfectly converged on the CrdtMerger's expected winner (lexically larger replicaId), proving safe conflict resolution under heavy concurrency.
   - *Secondary Sanity Check (Independent Writes)*: Verified by forcing two clients to edit *different* cells concurrently through NGINX. Proved that both non-conflicting writes land correctly and merge cleanly without interference.
+- **Stage 4 (Redis Blip Resilience)**: Used `docker stop` (not `docker pause`) to force genuine TCP-level socket errors, confirming that Lettuce throws `QueryTimeoutException` when publishing to a stopped Redis. The `SheetRedisPublisher` error log (`Failed to publish op to Redis for sheet ...`) fires correctly. Verified the full E2E reconnect flow: op persisted during blip, client reconnects, catch-up endpoint returns the missed op, specific `opId` assertion confirms it's present in the returned batch.
+- **Stage 5 (CRDT Convergence via NGINX)**: `verify-multi-node.js` generates 20 scrambled ops across 5 cells with randomized HLCs, fires them concurrently split between `backend-1` and `backend-2`, then asserts both clients' final state matches the offline-computed expected state using CrdtMerger logic. All 20 ops converge deterministically.
+- **Frontend Vite Proxy**: Updated `vite.config.ts` to proxy `/api` and `/ws-grid` to `http://localhost` (NGINX), and `stompClient.ts` to use relative `/ws-grid` URL.
+- **Browser Manual Verification (Stage 5)**: Confirmed live-sync (edit in Tab 1 appears in Tab 2), same-cell conflict convergence (CRDT tiebreak resolves correctly in both tabs), and catch-up-on-load (hard-refresh + re-seed shows previously converged cell value). Two bugs found and fixed: (1) `seedGrid()` used non-UUID IDs (`row-0000`) causing backend UUID parse failures — fixed to valid deterministic UUIDs; (2) `seedGrid()` was resetting `cells: {}` wiping catch-up state fetched on page load — fixed to only reset rows/cols structure.
+
+## Phase 10: Convergence Proof Suite (2026-10-02)
+
+**Scope limitation (explicit)**: Both suites cover **CELL_SET ops ONLY**. Structural ops (ROW_INSERT, ROW_DELETE, COL_INSERT, COL_DELETE) are **not tested** because they are not yet persisted in `op_log` or `grid_state` — a known limitation explicitly documented in Phases 6 and 8. Any attempt to test structural op convergence through the real backend would fail against the schema. Structural convergence is a future work item and must NOT be silently assumed to be covered here.
+
+Both suites run automatically in CI via the existing GitHub Actions `npm test` job — no workflow changes required. Both use the `mulberry32` seeded PRNG (no `Math.random()`), so any CI failure is fully reproducible from the seed value logged in the test name.
+
+### Suite 1 — Frontend Property-Based Convergence
+**File**: `frontend/src/crdt/__tests__/CrdtConvergence.test.ts`
+
+- **20 seeds**: `[1, 7, 13, 42, 99, 137, 256, 512, 1000, 1337, 2048, 3141, 5000, 7777, 9999, 11111, 22222, 31415, 65537, 99991]`
+- **50 ops per seed** across 5 fixed cells (`row-1:col-1` … `row-3:col-1`), 3 replicas, physicalTime in [1000, 1200] to force dense logical-counter conflicts
+- **Method**: Apply ops in original order to Replica A; apply same ops in deterministically shuffled order (Fisher-Yates with XOR'd seed → distinct shuffle per seed) to Replica B; assert `serializeState(A) === serializeState(B)`. Key-order-independent serialiser used.
+- **Additional tests**: single-pair commutativity, idempotency of double-apply
+- **Result**: 22 tests, all pass. Proves `CrdtMerger.merge()` is commutative and associative.
+
+### Suite 2 — Offline-Reconnect Convergence
+**File**: `frontend/src/store/__tests__/offlineConvergence.test.ts`
+
+- **20 seeds**: `[2, 11, 23, 55, 101, 200, 314, 888, 1024, 2000, 4096, 5555, 8192, 10000, 12345, 20000, 33333, 50000, 77777, 99999]`
+- **40 ops per seed**, partition point varied per seed (10–70% into the sequence) to cover different offline window positions
+- **Method**: Simulate offline replica that misses ops [P..N), accumulates 5 local pending ops (same-cell conflicts), reconnects via `applyCatchUpOps()`, replays pending ops idempotently via `applyRemoteOp`; assert final state equals always-online replica that also received the pending ops via broadcast
+- **Additional tests**: out-of-order DTO seq convergence, idempotent double-apply of same opId
+- **Result**: 22 tests, all pass. Proves the `stompClient.ts` catch-up path converges regardless of partition point.
+
+### Full `npm test` Run Summary
+```
+Test Files  9 passed (9)
+      Tests  66 passed (66)
+   Duration  41.72s
+```
+All pre-existing tests (HybridLogicalClock, PositionKey, CrdtMerger, useSheetStore, reconnectFlow, App) continue to pass.
